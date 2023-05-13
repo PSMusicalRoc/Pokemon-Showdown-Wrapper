@@ -9,6 +9,6 @@ This is a wrapper for the binary versions of Pokemon Showdown, intended for use 
 ## Credits
 
 - The wonderful people at [Pokemon Showdown](https://github.com/smogon/pokemon-showdown/) for making the program open source (and awesome!)
-- Niels Lohmann for the ever amazing [nlohmann json](https://github.com/nlohmann/json) library
+- Niels Lohmann and his contributors for the ever amazing [nlohmann json](https://github.com/nlohmann/json) library
 - Stack Overflow and ChatGPT for assistance understanding concurrency, as well as `fork`, `pipe`, and `execl`
 - ...and viewers like you! Thank you!
