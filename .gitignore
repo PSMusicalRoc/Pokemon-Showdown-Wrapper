@@ -1,0 +1,9 @@
+/.vscode
+/a.out
+/node_modules
+/output.json
+/package-lock.json
+/package.json
+/regex_test.out
+/regextest.cpp
+/testinput.txt
