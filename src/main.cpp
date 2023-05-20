@@ -244,10 +244,16 @@ int main() {
         close(in_pipe[0]);
         close(out_pipe[1]);
 
-        PShowdownParser parser;
+        PShowdownParser parser(in_pipe[1], out_pipe[0]);
 
         std::string incmd;
         while (true) {
+            if (parser.OppSelectMove())
+            {
+                // logic here for opp to select move
+                parser.OppSelectedMove();                
+            }
+
             std::cout << "Enter input: ";
             std::getline(std::cin, incmd);
             if (incmd.empty()) continue;
@@ -289,7 +295,15 @@ int main() {
             }
             else if (cmd[0] == "use")
             {
-                std::cout << "Using moves isn't quite ready yet :)" << std::endl;
+                //std::cout << "Using moves isn't quite ready yet :)" << std::endl;
+                std::string outcmd = ">p1 move";
+                for (int i = 1; i < cmd.size(); i++)
+                {
+                    outcmd += " " + cmd[i];
+                }
+                outcmd += "\n";
+                std::cout << "command : " << outcmd;
+                write(in_pipe[1], outcmd.c_str(), outcmd.size());
             }
             else if (cmd[0] == "switch")
             {
@@ -299,7 +313,7 @@ int main() {
             std::string output_str;
             get_output(out_pipe[0], output_str);
             std::string parsed_string = parser.parsePShowdownOutput(output_str);
-            //std::cout << output_str << std::endl;
+            std::cout << output_str << std::endl;
             std::cout << std::endl << parsed_string << std::endl;
         }
 

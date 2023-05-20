@@ -63,8 +63,10 @@ endif
 GENERATED :=
 OBJECTS :=
 
+GENERATED += $(OBJDIR)/AI_Types.o
 GENERATED += $(OBJDIR)/PShowdownParser.o
 GENERATED += $(OBJDIR)/main.o
+OBJECTS += $(OBJDIR)/AI_Types.o
 OBJECTS += $(OBJDIR)/PShowdownParser.o
 OBJECTS += $(OBJDIR)/main.o
 
@@ -130,6 +132,9 @@ endif
 # File Rules
 # #############################################
 
+$(OBJDIR)/AI_Types.o: src/AI_Types.cpp
+	@echo "$(notdir $<)"
+	$(SILENT) $(CXX) $(ALL_CXXFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
 $(OBJDIR)/PShowdownParser.o: src/PShowdownParser.cpp
 	@echo "$(notdir $<)"
 	$(SILENT) $(CXX) $(ALL_CXXFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"

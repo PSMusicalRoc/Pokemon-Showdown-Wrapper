@@ -2,6 +2,8 @@
 #include <vector>
 #include <regex>
 
+#include "AI_Types.h"
+
 std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
 {
     // first things first, we need to separate all the parts of this input.
@@ -134,6 +136,27 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
             // (probably for double/triple battles)
             (*player)["active"] = parsed["active"][0];
             (*player)["party"] = parsed["side"]["pokemon"];
+
+            if (parsed["rqid"].is_null())
+            {
+                output += "No request ID\n";
+            }
+            else
+            {
+                output += "Request ID: ";
+                output += std::to_string((int)parsed["rqid"]);
+                output += "\n";
+            }
+
+            if (parsed["rqid"].is_null())
+            {
+                // Select a move
+                if (m_curr_editing == 2)
+                {
+                    std::cout << "Selecting move for p2" << std::endl;
+                    AI_Choose_Move(m_p2data, m_inpipe, AI_TYPE_RANDOM);
+                }
+            }
         }
 
 
