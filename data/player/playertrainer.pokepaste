@@ -1,5 +1,6 @@
 Gliscor @ Toxic Orb  
 Ability: Poison Heal  
+Level: 50
 EVs: 244 HP / 128 SpD / 136 Spe  
 Jolly Nature  
 - Wing Attack  
@@ -9,6 +10,7 @@ Jolly Nature
 
 Tyranitar @ Chople Berry  
 Ability: Sand Stream  
+Level: 50
 EVs: 252 HP / 4 Atk / 252 SpD  
 Careful Nature  
 - Crunch  
@@ -18,6 +20,7 @@ Careful Nature
 
 Volcarona @ Lum Berry  
 Ability: Flame Body  
+Level: 50
 EVs: 72 HP / 252 SpA / 184 Spe  
 Timid Nature  
 IVs: 2 Atk / 30 Def  
@@ -28,6 +31,7 @@ IVs: 2 Atk / 30 Def
 
 Forretress @ Leftovers  
 Ability: Sturdy  
+Level: 50
 EVs: 252 HP / 4 Def / 252 SpD  
 Sassy Nature  
 - Spikes  
@@ -37,6 +41,7 @@ Sassy Nature
 
 Rotom-Wash @ Leftovers  
 Ability: Levitate  
+Level: 50
 EVs: 252 HP / 4 Def / 252 SpD  
 Calm Nature  
 IVs: 0 Atk  
@@ -47,6 +52,7 @@ IVs: 0 Atk
 
 Latios (M) @ Choice Scarf  
 Ability: Levitate  
+Level: 50
 EVs: 252 SpA / 4 SpD / 252 Spe  
 Timid Nature  
 IVs: 0 Atk  

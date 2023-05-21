@@ -11,6 +11,8 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 
+#include "PK_Rand.h"
+
 using json=nlohmann::json;
 
 void get_output(int outpipe, std::string& output_str)
@@ -26,7 +28,48 @@ void get_output(int outpipe, std::string& output_str)
         char output[2048];
 
         // Use select() to check if data is available to be read from out_pipe[0]
-        timeval timeout = {0, 1500000};  // Wait up to 1.5 seconds
+        // timeval timeout = {0, 1500000};  // Wait up to 1.5 seconds
+        // int num_ready = select(outpipe + 1, &read_set, NULL, NULL, &timeout);
+
+        // std::cout << "Num Ready : " << num_ready << std::endl;
+
+        // if (num_ready > 0) {
+            // Data is available to be read
+            len = read(outpipe, output, sizeof(output));
+            //std::cout << len << std::endl;
+            if (len > 0) {
+                output[len] = '\0';
+                output_str += output;
+                if (len < 2048)
+                    break;
+            }
+            else break;
+        // } else if (num_ready == 0) {
+        //     // No data is available to be read
+        //     //std::cout << "No data" << std::endl;
+        //     break;
+        // } else {
+        //     // Error occurred
+        //     std::cerr << "Error: select() failed!\n";
+        //     break;
+        // }
+    }
+}
+
+void get_output_timed(int outpipe, std::string& output_str, float num_secs)
+{
+    fd_set read_set;
+    FD_ZERO(&read_set);
+    FD_SET(outpipe, &read_set);
+
+    output_str = "";
+
+    while (true) {
+        ssize_t len;
+        char output[2048];
+
+        // Use select() to check if data is available to be read from out_pipe[0]
+        timeval timeout = {0, 1000000 * num_secs};
         int num_ready = select(outpipe + 1, &read_set, NULL, NULL, &timeout);
 
         // std::cout << "Num Ready : " << num_ready << std::endl;
@@ -209,7 +252,7 @@ void parse_cmd_to_vec(const std::string& cmd, std::vector<std::string>& outvec)
     }
 }
 
-int main() {
+int main() {    
     const char* command = "../pokemon-showdown/pokemon-showdown";
     int in_pipe[2];
     int out_pipe[2];
@@ -302,18 +345,32 @@ int main() {
                     outcmd += " " + cmd[i];
                 }
                 outcmd += "\n";
-                std::cout << "command : " << outcmd;
                 write(in_pipe[1], outcmd.c_str(), outcmd.size());
             }
             else if (cmd[0] == "switch")
             {
-                std::cout << "Switching isn't quite ready yet :)" << std::endl;
+                std::string outcmd = ">p1 switch";
+                for (int i = 1; i < cmd.size(); i++)
+                {
+                    outcmd += " " + cmd[i];
+                }
+                outcmd += "\n";
+                write(in_pipe[1], outcmd.c_str(), outcmd.size());
             }
+            else continue;
 
-            std::string output_str;
+            std::string output_str, full_out;
             get_output(out_pipe[0], output_str);
+            full_out = output_str;
             std::string parsed_string = parser.parsePShowdownOutput(output_str);
-            std::cout << output_str << std::endl;
+            while (output_str != "")
+            {
+                get_output_timed(out_pipe[0], output_str, 1.5);
+                full_out += output_str;
+                parsed_string += parser.parsePShowdownOutput(output_str);
+            }
+            
+            //std::cout << full_out << std::endl;
             std::cout << std::endl << parsed_string << std::endl;
         }
 
