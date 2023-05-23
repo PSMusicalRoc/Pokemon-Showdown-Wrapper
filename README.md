@@ -2,6 +2,8 @@
 
 This is a wrapper for the binary versions of Pokemon Showdown, intended for use in future projects. The whole idea (at the moment, at least) is to be able to use Pokemon Showdown's output for whatever I might need. As such, this wrapper directly calls a PShowdown binary, runs it concurrently in a separate thread, and funnels inputs to and outputs from it.
 
+Because my implementation currently relies on the actual Pokemon Showdown commandline tools, Node.js is required for this to work. More dependencies and an installation tutorial will be posted as work continues.
+
 ## Installation
 
 `@TODO`
