@@ -1,101 +1,39 @@
 #include <iostream>
-#include <cstdio>
-#include <unistd.h>
-#include <string>
-#include <fcntl.h>
-#include <sys/wait.h>
+#ifdef ROC_NIX
+#include "UNIX_PID_HANDLER.h"
+#elif ROC_WINDOWS
+#include <Windows.h>
+#endif
 #include <vector>
 #include <algorithm>
 
 #include "PShowdownParser.h"
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include <string>
 
 #include "PK_Rand.h"
 
+/**
+ * Gonna have to do some major porting to use windows unfortunately.
+*/
+
 using json=nlohmann::json;
 
-void get_output(int outpipe, std::string& output_str)
-{
-    fd_set read_set;
-    FD_ZERO(&read_set);
-    FD_SET(outpipe, &read_set);
+// Important things for Linux and Windows differentiation
 
-    output_str = "";
+#ifdef ROC_NIX
 
-    while (true) {
-        ssize_t len;
-        char output[2048];
 
-        // Use select() to check if data is available to be read from out_pipe[0]
-        // timeval timeout = {0, 1500000};  // Wait up to 1.5 seconds
-        // int num_ready = select(outpipe + 1, &read_set, NULL, NULL, &timeout);
 
-        // std::cout << "Num Ready : " << num_ready << std::endl;
+#elif ROC_WINDOWS
 
-        // if (num_ready > 0) {
-            // Data is available to be read
-            len = read(outpipe, output, sizeof(output));
-            //std::cout << len << std::endl;
-            if (len > 0) {
-                output[len] = '\0';
-                output_str += output;
-                if (len < 2048)
-                    break;
-            }
-            else break;
-        // } else if (num_ready == 0) {
-        //     // No data is available to be read
-        //     //std::cout << "No data" << std::endl;
-        //     break;
-        // } else {
-        //     // Error occurred
-        //     std::cerr << "Error: select() failed!\n";
-        //     break;
-        // }
-    }
-}
+HANDLE stin_read;
+HANDLE stin_write;
+HANDLE stout_read;
+HANDLE stout_write;
 
-void get_output_timed(int outpipe, std::string& output_str, float num_secs)
-{
-    fd_set read_set;
-    FD_ZERO(&read_set);
-    FD_SET(outpipe, &read_set);
-
-    output_str = "";
-
-    while (true) {
-        ssize_t len;
-        char output[2048];
-
-        // Use select() to check if data is available to be read from out_pipe[0]
-        timeval timeout = {0, 1000000 * num_secs};
-        int num_ready = select(outpipe + 1, &read_set, NULL, NULL, &timeout);
-
-        // std::cout << "Num Ready : " << num_ready << std::endl;
-
-        if (num_ready > 0) {
-            // Data is available to be read
-            len = read(outpipe, output, sizeof(output));
-            //std::cout << len << std::endl;
-            if (len > 0) {
-                output[len] = '\0';
-                output_str += output;
-                if (len < 2048)
-                    break;
-            }
-            else break;
-        } else if (num_ready == 0) {
-            // No data is available to be read
-            //std::cout << "No data" << std::endl;
-            break;
-        } else {
-            // Error occurred
-            std::cerr << "Error: select() failed!\n";
-            break;
-        }
-    }
-}
+#endif
 
 void LoadTrainerData(std::string& battleFilename, json& playerdata, std::string& packed_team)
 {
@@ -252,133 +190,100 @@ void parse_cmd_to_vec(const std::string& cmd, std::vector<std::string>& outvec)
     }
 }
 
-int main() {    
-    int in_pipe[2];
-    int out_pipe[2];
-    pid_t pid;
+int main() {
+    PShowdownParser parser(in_pipe[1], out_pipe[0]);
 
-    if (pipe(in_pipe) == -1 || pipe(out_pipe) == -1) {
-        std::cerr << "Error: pipe() failed!\n";
-        return 1;
-    }
-
-    if ((pid = fork()) == -1) {
-        std::cerr << "Error: fork() failed!\n";
-        return 1;
-    } else if (pid == 0) {
-        // Child process: execute the command and send output to parent
-        close(in_pipe[1]);
-        close(out_pipe[0]);
-
-        dup2(in_pipe[0], STDIN_FILENO);
-        dup2(out_pipe[1], STDOUT_FILENO);
-
-        close(in_pipe[0]);
-        close(out_pipe[1]);
-
-        // Redirect stderr to /dev/null to suppress error messages
-        int fd = open("/dev/null", O_WRONLY);
-        dup2(fd, STDERR_FILENO);
-
-        execl("vendor/pokemon-showdown/pokemon-showdown", "pokemon-showdown", "simulate-battle", NULL);
-
-        std::cout << "The program has failed." << std::endl;
-    } else {
-        // Parent process: read user input and send it to child
-        close(in_pipe[0]);
-        close(out_pipe[1]);
-
-        PShowdownParser parser(in_pipe[1], out_pipe[0]);
-
-        std::string incmd;
-        while (true) {
-            if (parser.OppSelectMove())
-            {
-                // logic here for opp to select move
-                parser.OppSelectedMove();                
-            }
-
-            std::cout << "Enter input: ";
-            std::getline(std::cin, incmd);
-            if (incmd.empty()) continue;
-
-            if (incmd == "exit") {break;}
-
-            std::vector<std::string> cmd;
-            parse_cmd_to_vec(incmd, cmd);
-
-            if (cmd[0] == "start")
-            {
-                // format == "start [format]"
-                std::string outcmd = ">start {\"formatid\":\"";
-                outcmd += cmd[1];
-                outcmd += "\"}\n";
-                write(in_pipe[1], outcmd.c_str(), outcmd.size());
-            }
-            else if (cmd[0] == "setplayer")
-            {
-                // format: "setplayer [playernum] [playername]"
-                std::string outcmd = ">player p";
-                outcmd += cmd[1];
-                outcmd += " {\"name\":\"";
-                outcmd += cmd[2];
-                outcmd += "\"}\n";
-                write(in_pipe[1], outcmd.c_str(), outcmd.size());
-            }
-            else if (cmd[0] == "moves")
-            {
-                std::cout << parser.QueryMoves() << std::endl;
-                continue;
-            }
-            else if (cmd[0] == "loadbattle")
-            {
-                std::string out;
-                SetupAITrainerBattle(cmd[1], in_pipe[1], out_pipe[0],
-                    out, parser);
-                std::cout << out << std::endl;
-            }
-            else if (cmd[0] == "use")
-            {
-                //std::cout << "Using moves isn't quite ready yet :)" << std::endl;
-                std::string outcmd = ">p1 move";
-                for (int i = 1; i < cmd.size(); i++)
-                {
-                    outcmd += " " + cmd[i];
-                }
-                outcmd += "\n";
-                write(in_pipe[1], outcmd.c_str(), outcmd.size());
-            }
-            else if (cmd[0] == "switch")
-            {
-                std::string outcmd = ">p1 switch";
-                for (int i = 1; i < cmd.size(); i++)
-                {
-                    outcmd += " " + cmd[i];
-                }
-                outcmd += "\n";
-                int retval = write(in_pipe[1], outcmd.c_str(), outcmd.size());
-                std::cout << retval << std::endl;
-            }
-            else continue;
-
-            std::string output_str, full_out;
-            get_output_timed(out_pipe[0], output_str, 5.0f);
-            full_out = output_str;
-            //std::string parsed_string = parser.parsePShowdownOutput(output_str);
-            while (output_str != "")
-            {
-                get_output_timed(out_pipe[0], output_str, 1.5);
-                full_out += output_str;
-            }
-            std::string parsed_string = parser.parsePShowdownOutput(full_out);
-            std::cout << full_out << std::endl;
-            std::cout << std::endl << parsed_string << std::endl;
+    std::string incmd;
+    while (true) {
+        if (parser.OppSelectMove())
+        {
+            // logic here for opp to select move
+            parser.OppSelectedMove();                
         }
 
+        std::cout << "Enter input: ";
+        std::getline(std::cin, incmd);
+        if (incmd.empty()) continue;
+
+        if (incmd == "exit") {break;}
+
+        std::vector<std::string> cmd;
+        parse_cmd_to_vec(incmd, cmd);
+
+        if (cmd[0] == "start")
+        {
+            // format == "start [format]"
+            std::string outcmd = ">start {\"formatid\":\"";
+            outcmd += cmd[1];
+            outcmd += "\"}\n";
+            write(in_pipe[1], outcmd.c_str(), outcmd.size());
+        }
+        else if (cmd[0] == "setplayer")
+        {
+            // format: "setplayer [playernum] [playername]"
+            std::string outcmd = ">player p";
+            outcmd += cmd[1];
+            outcmd += " {\"name\":\"";
+            outcmd += cmd[2];
+            outcmd += "\"}\n";
+            write(in_pipe[1], outcmd.c_str(), outcmd.size());
+        }
+        else if (cmd[0] == "moves")
+        {
+            std::cout << parser.QueryMoves() << std::endl;
+            continue;
+        }
+        else if (cmd[0] == "loadbattle")
+        {
+            std::string out;
+            SetupAITrainerBattle(cmd[1], in_pipe[1], out_pipe[0],
+                out, parser);
+            std::cout << out << std::endl;
+        }
+        else if (cmd[0] == "use")
+        {
+            //std::cout << "Using moves isn't quite ready yet :)" << std::endl;
+            std::string outcmd = ">p1 move";
+            for (int i = 1; i < cmd.size(); i++)
+            {
+                outcmd += " " + cmd[i];
+            }
+            outcmd += "\n";
+            write(in_pipe[1], outcmd.c_str(), outcmd.size());
+        }
+        else if (cmd[0] == "switch")
+        {
+            std::string outcmd = ">p1 switch";
+            for (int i = 1; i < cmd.size(); i++)
+            {
+                outcmd += " " + cmd[i];
+            }
+            outcmd += "\n";
+            int retval = write(in_pipe[1], outcmd.c_str(), outcmd.size());
+            std::cout << retval << std::endl;
+        }
+        else continue;
+
+        std::string output_str, full_out;
+        get_output_timed(out_pipe[0], output_str, 5.0f);
+        full_out = output_str;
+        //std::string parsed_string = parser.parsePShowdownOutput(output_str);
+        while (output_str != "")
+        {
+            get_output_timed(out_pipe[0], output_str, 1.5);
+            full_out += output_str;
+        }
+        std::string parsed_string = parser.parsePShowdownOutput(full_out);
+        std::cout << full_out << std::endl;
+        std::cout << std::endl << parsed_string << std::endl;
+
+        /**
+         * This part of the program deals with closing and
+         * making sure that the child process closes correctly.
+        */
+
         // Close pipes and terminate child process
-        close(in_pipe[1]);
-        close(out_pipe[0]);
-        waitpid(pid, NULL, 0);
+        // @todo include close macro here
     }
 
     return 0;
