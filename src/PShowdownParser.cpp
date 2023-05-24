@@ -4,6 +4,8 @@
 
 #include "AI_Types.h"
 
+#define OUTPUT_MAC          (*output)
+
 #define EFFECT_PROTECT      "move: Protect"
 
 #define SINGLETURN_PROTECT  "Protect"
@@ -65,7 +67,8 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
         {
             // we're separated by a newline
             std::string substr = input.substr(index, nl_pos - index);
-            readable.push_back(substr);
+            //if (substr != "")
+                readable.push_back(substr);
             readable.push_back("\n"); // useful for things like split and ability
             index = nl_pos + 1;
         }
@@ -75,15 +78,15 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
     /** From here, we have all the output neatly sorted in the readable vector */
 
 
-    // This is a hacky fix for sideupdate...
-    // Sideupdate means that the same command is essentially
+    // This is a hacky fix for split...
+    // split means that the same command is essentially
     // just sent twice. We don't want that, so we're gonna do
     // this.
-    bool justcaughtsideupdate = false;
-    bool donefirstsideupdate = false;
-    bool donesecondsideupdate = false;
+    bool justcaughtsplit = false;
+    bool donefirstsplit = false;
+    bool donesecondsplit = false;
     std::string out, buff_to_remove;
-    std::string& output = out;
+    std::string* output = &out;
 
     for (int i = 0; i < readable.size(); i++)
     {
@@ -92,24 +95,24 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
         // if it's a newline outside of the newline
         // supported commands, just continue, make
         // the program go as fast as possible.
-        if (curr == "\n") continue;
+        if (curr == "\n" || curr == "") continue;
 
-        // Sideupdate handling
-        if (justcaughtsideupdate)
+        // Split handling
+        if (justcaughtsplit)
         {
-            justcaughtsideupdate = false;
-            donefirstsideupdate = true;
+            justcaughtsplit = false;
+            donefirstsplit = true;
         }
-        else if (donefirstsideupdate)
+        else if (donefirstsplit)
         {
-            donefirstsideupdate = false;
-            donesecondsideupdate = true;
-            output = buff_to_remove;
+            donefirstsplit = false;
+            donesecondsplit = true;
+            output = &buff_to_remove;
         }
-        else if (donesecondsideupdate)
+        else if (donesecondsplit)
         {
-            donesecondsideupdate = false;
-            output = out;
+            donesecondsplit = false;
+            output = &out;
         }
 
 
@@ -269,18 +272,24 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
             if (player == "p1") m_curr_editing = 1;
             else if (player == "p2") m_curr_editing = 2;
             else m_curr_editing = 0;
+            continue;
+        }
 
-            justcaughtsideupdate = true;
+        if (curr == "split")
+        {
+            //|split|PLAYER
+            i++; std::string player_ident = readable[i];
+            justcaughtsplit = true;
             continue;
         }
 
         if (curr == "start")
         {
-            output += "Pokemon battle between ";
-            output += m_p1data["name"];
-            output += " and ";
-            output += m_p2data["name"];
-            output += " begins!\n";
+            OUTPUT_MAC += "Pokemon battle between ";
+            OUTPUT_MAC += m_p1data["name"];
+            OUTPUT_MAC += " and ";
+            OUTPUT_MAC += m_p2data["name"];
+            OUTPUT_MAC += " begins!\n";
 
             json* you = nullptr;
             json* opp = nullptr;
@@ -296,9 +305,9 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
                 opp = &m_p1data;
             }
 
-            output += "Opponent has ";
-            output += std::to_string((int)(*opp)["teamsize"]);
-            output += " Pokemon.\n";
+            OUTPUT_MAC += "Opponent has ";
+            OUTPUT_MAC += std::to_string((int)(*opp)["teamsize"]);
+            OUTPUT_MAC += " Pokemon.\n";
         }
 
         if (curr == "t:")
@@ -340,9 +349,9 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
         {
             //|turn|NUMBER
             i++; std::string turn_num = readable[i];
-            output += "Turn ";
-            output += turn_num;
-            output += "\n\n";
+            OUTPUT_MAC += "Turn ";
+            OUTPUT_MAC += turn_num;
+            OUTPUT_MAC += "\n\n";
         }
 
         if (curr == "upkeep")
@@ -354,7 +363,7 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
         if (curr == "win")
         {
             i++; std::string winner = readable[i];
-            output += winner + " won the battle!\n";
+            OUTPUT_MAC += winner + " won the battle!\n";
         }
 
 
@@ -437,7 +446,7 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
                 if (testident == pk_ident)
                 {
                     std::string pkdetails(pk["details"]);
-                    output += pkdetails + " fainted!\n";
+                    OUTPUT_MAC += pkdetails + " fainted!\n";
                 }
             }
         }
@@ -450,10 +459,10 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
             i++; std::string move = readable[i];
             i++; std::string target = readable[i];
 
-            output += user;
-            output += " used ";
-            output += move;
-            output += "!\n";
+            OUTPUT_MAC += user;
+            OUTPUT_MAC += " used ";
+            OUTPUT_MAC += move;
+            OUTPUT_MAC += "!\n";
         }
 
         if (curr == "replace")
@@ -496,10 +505,10 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
             if (!(*player)["active"]["pokemon"].is_null())
             {
                 if ((*player)["active"]["pokemon"]["name"] == pk_details) continue;
-                output += (*player)["name"];
-                output += " withdrew ";
-                output += (*player)["active"]["pokemon"]["name"];
-                output += "!\n";
+                OUTPUT_MAC += (*player)["name"];
+                OUTPUT_MAC += " withdrew ";
+                OUTPUT_MAC += (*player)["active"]["pokemon"]["name"];
+                OUTPUT_MAC += "!\n";
             }
 
             (*player)["active"]["pokemon"] = 
@@ -509,10 +518,10 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
                 {"hp",pk_hp}
             };
 
-            output += (*player)["name"];
-            output += " sent out ";
-            output += (*player)["active"]["pokemon"]["name"];
-            output += "!\n";
+            OUTPUT_MAC += (*player)["name"];
+            OUTPUT_MAC += " sent out ";
+            OUTPUT_MAC += (*player)["active"]["pokemon"]["name"];
+            OUTPUT_MAC += "!\n";
         }
 
 
@@ -532,9 +541,9 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
             if (effect == "\n")
             {
                 //|-ability|POKEMON|ABILITY
-                output += pk_ident;
-                output += "'s ";
-                output += ability + "!\n";
+                OUTPUT_MAC += pk_ident;
+                OUTPUT_MAC += "'s ";
+                OUTPUT_MAC += ability + "!\n";
                 continue;
             }
             else
@@ -552,8 +561,8 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
 
             if (effect == EFFECT_PROTECT)
             {
-                output += pk_ident;
-                output += " protected itself!\n";
+                OUTPUT_MAC += pk_ident;
+                OUTPUT_MAC += " protected itself!\n";
             }
             continue;
         }
@@ -599,27 +608,27 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
             else if (stat == STAT_SPEED)
                 stat_output = "speed";
             
-            output += pokemon["name"];
-            output += "'s ";
-            output += stat_output;
-            output += " ";
+            OUTPUT_MAC += pokemon["name"];
+            OUTPUT_MAC += "'s ";
+            OUTPUT_MAC += stat_output;
+            OUTPUT_MAC += " ";
 
             switch (amount)
             {
             case 0:
-                output += STAT_RAISED_0;
+                OUTPUT_MAC += STAT_RAISED_0;
                 break;
             case 1:
-                output += STAT_RAISED_1;
+                OUTPUT_MAC += STAT_RAISED_1;
                 break;
             case 2:
-                output += STAT_RAISED_2;
+                OUTPUT_MAC += STAT_RAISED_2;
                 break;
             default:
-                output += STAT_RAISED_3PLUS;
+                OUTPUT_MAC += STAT_RAISED_3PLUS;
                 break;
             }
-            output += "\n";
+            OUTPUT_MAC += "\n";
         }
 
         if (curr == "-burst")
@@ -684,8 +693,8 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
         {
             //|-crit|POKEMON
             i++; std::string pk_ident = readable[i];
-            output += "Critical hit on ";
-            output += pk_ident + "!\n";
+            OUTPUT_MAC += "Critical hit on ";
+            OUTPUT_MAC += pk_ident + "!\n";
         }
 
         if (curr == "-curestatus")
@@ -714,20 +723,20 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
                 std::string source = fromsource.substr(7);
                 if (source == STATUS_POISON)
                 {
-                    output += pk_ident;
-                    output += " was hurt by poison!\n";
+                    OUTPUT_MAC += pk_ident;
+                    OUTPUT_MAC += " was hurt by poison!\n";
                     continue;
                 }
                 if (source == STATUS_BURN)
                 {
-                    output += pk_ident;
-                    output += " was hurt by its burn!\n";
+                    OUTPUT_MAC += pk_ident;
+                    OUTPUT_MAC += " was hurt by its burn!\n";
                     continue;
                 }
                 
-                output += pk_ident;
-                output += " was damaged by ";
-                output += source + "!\n";
+                OUTPUT_MAC += pk_ident;
+                OUTPUT_MAC += " was damaged by ";
+                OUTPUT_MAC += source + "!\n";
             }
             continue;
         }
@@ -768,7 +777,7 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
         {
             //|-fail|POKEMON|ACTION
             i++; i++;
-            output += "But it failed!\n";
+            OUTPUT_MAC += "But it failed!\n";
             continue;
         }
 
@@ -813,8 +822,8 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
         {
             //|-immune|POKEMON
             i++; std::string pk_ident = readable[i];
-            output += "It didn't affect ";
-            output += pk_ident + "...\n";
+            OUTPUT_MAC += "It didn't affect ";
+            OUTPUT_MAC += pk_ident + "...\n";
         }
 
         if (curr == "-invertboost")
@@ -861,8 +870,8 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
             //|-miss|SOURCE|TARGET
             i++; std::string pk_ident = readable[i];
             i++; std::string target = readable[i];
-            output += target;
-            output += " avoided the attack!\n";
+            OUTPUT_MAC += target;
+            OUTPUT_MAC += " avoided the attack!\n";
         }
 
         if (curr == "-mustrecharge")
@@ -884,7 +893,7 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
             //|-nothing
             // [note]: this is apparently deprecated, in
             // the future this may change.
-            output += "But nothing happened!\n";
+            OUTPUT_MAC += "But nothing happened!\n";
             continue;
         }
 
@@ -916,7 +925,7 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
         if (curr == "-resisted")
         {
             i++;
-            output += "It wasn't very effective...\n";
+            OUTPUT_MAC += "It wasn't very effective...\n";
         }
 
         if (curr == "-setboost")
@@ -968,8 +977,8 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
 
             if (effect == SINGLETURN_PROTECT)
             {
-                output += pk_ident;
-                output += " protected itself!\n";
+                OUTPUT_MAC += pk_ident;
+                OUTPUT_MAC += " protected itself!\n";
             }
             continue;
         }
@@ -993,7 +1002,7 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
         if (curr == "-supereffective")
         {
             i++;
-            output += "It was super-effective!\n";
+            OUTPUT_MAC += "It was super-effective!\n";
         }
 
         if (curr == "-swapboost")
@@ -1053,27 +1062,27 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
             else if (stat == STAT_SPEED)
                 stat_output = "speed";
             
-            output += pokemon["name"];
-            output += "'s ";
-            output += stat_output;
-            output += " ";
+            OUTPUT_MAC += pokemon["name"];
+            OUTPUT_MAC += "'s ";
+            OUTPUT_MAC += stat_output;
+            OUTPUT_MAC += " ";
 
             switch (amount)
             {
             case 0:
-                output += STAT_LOWER_0;
+                OUTPUT_MAC += STAT_LOWER_0;
                 break;
             case 1:
-                output += STAT_LOWER_1;
+                OUTPUT_MAC += STAT_LOWER_1;
                 break;
             case 2:
-                output += STAT_LOWER_2;
+                OUTPUT_MAC += STAT_LOWER_2;
                 break;
             default:
-                output += STAT_LOWER_3PLUS;
+                OUTPUT_MAC += STAT_LOWER_3PLUS;
                 break;
             }
-            output += "\n";
+            OUTPUT_MAC += "\n";
         }
     
         if (curr == "-waiting")
@@ -1094,19 +1103,19 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
                 weather = m_battledata["weather"];
                 if (weather == WEATHER_SANDSTORM)
                 {
-                    output += "Sandstorm over.\n";
+                    OUTPUT_MAC += "Sandstorm over.\n";
                 }
                 if (weather == WEATHER_SUN)
                 {
-                    output += "Bright Sunlight over.\n";
+                    OUTPUT_MAC += "Bright Sunlight over.\n";
                 }
                 if (weather == WEATHER_RAIN)
                 {
-                    output += "The rain stopped.\n";
+                    OUTPUT_MAC += "The rain stopped.\n";
                 }
                 if (weather == WEATHER_HAIL)
                 {
-                    output += "Hail over.\n";
+                    OUTPUT_MAC += "Hail over.\n";
                 }
                 m_battledata["weather"] = WEATHER_NULL;
                 continue;
@@ -1115,11 +1124,11 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
             {
                 if (m_battledata["weather"].is_null() || m_battledata["weather"] != WEATHER_SANDSTORM)
                 {
-                    output += "A sandstorm kicked up!\n";
+                    OUTPUT_MAC += "A sandstorm kicked up!\n";
                 }
                 else
                 {
-                    output += "The sandstorm rages.\n";
+                    OUTPUT_MAC += "The sandstorm rages.\n";
                 }
                 m_battledata["weather"] = WEATHER_SANDSTORM;
             }
@@ -1127,11 +1136,11 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
             {
                 if (m_battledata["weather"].is_null() || m_battledata["weather"] != WEATHER_SUN)
                 {
-                    output += "The sunlight turned harsh!\n";
+                    OUTPUT_MAC += "The sunlight turned harsh!\n";
                 }
                 else
                 {
-                    output += "The sunlight is strong.\n";
+                    OUTPUT_MAC += "The sunlight is strong.\n";
                 }
                 m_battledata["weather"] = WEATHER_SUN;
             }
@@ -1139,11 +1148,11 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
             {
                 if (m_battledata["weather"].is_null() || m_battledata["weather"] != WEATHER_RAIN)
                 {
-                    output += "It began to rain!\n";
+                    OUTPUT_MAC += "It began to rain!\n";
                 }
                 else
                 {
-                    output += "It is raining.\n";
+                    OUTPUT_MAC += "It is raining.\n";
                 }
                 m_battledata["weather"] = WEATHER_RAIN;
             }
@@ -1151,11 +1160,11 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
             {
                 if (m_battledata["weather"].is_null() || m_battledata["weather"] != WEATHER_HAIL)
                 {
-                    output += "It began to hail!\n";
+                    OUTPUT_MAC += "It began to hail!\n";
                 }
                 else
                 {
-                    output += "It is hailing.\n";
+                    OUTPUT_MAC += "It is hailing.\n";
                 }
                 m_battledata["weather"] = WEATHER_HAIL;
             }

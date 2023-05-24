@@ -192,7 +192,7 @@ void SetupAITrainerBattle(std::string& ai_filename, int inputstream, int outstre
     write(inputstream, command.c_str(), command.size());
     //std::cout << "Getting output" << std::endl;
     get_output(outstream, ret);
-    //std::cout << ret << std::endl;
+    std::cout << ret << std::endl;
     //std::cout << "Parsing" << std::endl;
     output += parser.parsePShowdownOutput(ret);
 
@@ -208,7 +208,7 @@ void SetupAITrainerBattle(std::string& ai_filename, int inputstream, int outstre
     write(inputstream, command.c_str(), command.size());
     //std::cout << "Getting output" << std::endl;
     get_output(outstream, ret);
-    //std::cout << ret << std::endl;
+    std::cout << ret << std::endl;
     //std::cout << "Parsing" << std::endl;
     output += parser.parsePShowdownOutput(ret);
 
@@ -223,7 +223,7 @@ void SetupAITrainerBattle(std::string& ai_filename, int inputstream, int outstre
     write(inputstream, command.c_str(), command.size());
     //std::cout << "Getting output" << std::endl;
     get_output(outstream, ret);
-    //std::cout << ret << std::endl;
+    std::cout << ret << std::endl;
     //std::cout << "Parsing" << std::endl;
     output += parser.parsePShowdownOutput(ret);
 
@@ -364,15 +364,14 @@ int main() {
             std::string output_str, full_out;
             get_output_timed(out_pipe[0], output_str, 5.0f);
             full_out = output_str;
-            std::string parsed_string = parser.parsePShowdownOutput(output_str);
+            //std::string parsed_string = parser.parsePShowdownOutput(output_str);
             while (output_str != "")
             {
                 get_output_timed(out_pipe[0], output_str, 1.5);
                 full_out += output_str;
-                parsed_string += parser.parsePShowdownOutput(output_str);
             }
-            
-            //std::cout << full_out << std::endl;
+            std::string parsed_string = parser.parsePShowdownOutput(full_out);
+            std::cout << full_out << std::endl;
             std::cout << std::endl << parsed_string << std::endl;
         }
 
