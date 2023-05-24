@@ -24,7 +24,7 @@ void __AI_Choose_Random(json& playerdata, int writepipe)
     // this line inconsistently freezes the program
     // need to figure out why but too lazy atm lol
     //int choice = PK_RAND::mt_rand() % 4;
-    int choice = PK_RAND::mt_rand() % 4;
+    int choice = 1 + PK_RAND::mt_rand() % 4;
     std::cout << choice << std::endl;
     std::string command = ">p2 move ";
     command += std::to_string(choice);

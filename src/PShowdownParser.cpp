@@ -4,6 +4,10 @@
 
 #include "AI_Types.h"
 
+#define EFFECT_PROTECT      "move: Protect"
+
+#define SINGLETURN_PROTECT  "Protect"
+
 #define STAT_RAISED_0       "won't go higher!"
 #define STAT_RAISED_1       "rose!"
 #define STAT_RAISED_2       "sharply rose!"
@@ -18,6 +22,18 @@
 #define STAT_SPEC_ATTACK    "spa"
 #define STAT_SPEC_DEFENSE   "spd"
 #define STAT_SPEED          "spe"
+
+
+#define STATUS_BURN         "brn"
+#define STATUS_POISON       "psn"
+#define STATUS_TOXIC        "tox"
+
+#define WEATHER_SANDSTORM   "Sandstorm"
+#define WEATHER_RAIN        "Rain"
+#define WEATHER_HAIL        "Hail"
+#define WEATHER_SUN         "Sun"
+#define WEATHER_NULL        "none"
+
 
 std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
 {
@@ -59,7 +75,16 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
     /** From here, we have all the output neatly sorted in the readable vector */
 
 
-    std::string output = "";
+    // This is a hacky fix for sideupdate...
+    // Sideupdate means that the same command is essentially
+    // just sent twice. We don't want that, so we're gonna do
+    // this.
+    bool justcaughtsideupdate = false;
+    bool donefirstsideupdate = false;
+    bool donesecondsideupdate = false;
+    std::string out, buff_to_remove;
+    std::string& output = out;
+
     for (int i = 0; i < readable.size(); i++)
     {
         std::string& curr = readable[i];
@@ -68,6 +93,24 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
         // supported commands, just continue, make
         // the program go as fast as possible.
         if (curr == "\n") continue;
+
+        // Sideupdate handling
+        if (justcaughtsideupdate)
+        {
+            justcaughtsideupdate = false;
+            donefirstsideupdate = true;
+        }
+        else if (donefirstsideupdate)
+        {
+            donefirstsideupdate = false;
+            donesecondsideupdate = true;
+            output = buff_to_remove;
+        }
+        else if (donesecondsideupdate)
+        {
+            donesecondsideupdate = false;
+            output = out;
+        }
 
 
         /*
@@ -226,6 +269,9 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
             if (player == "p1") m_curr_editing = 1;
             else if (player == "p2") m_curr_editing = 2;
             else m_curr_editing = 0;
+
+            justcaughtsideupdate = true;
+            continue;
         }
 
         if (curr == "start")
@@ -480,12 +526,15 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
 
         if (curr == "-ability")
         {
-            i++;
-            i++;
+            i++; std::string pk_ident = readable[i];
+            i++; std::string ability = readable[i];
             i++; std::string& effect = readable[i];
             if (effect == "\n")
             {
                 //|-ability|POKEMON|ABILITY
+                output += pk_ident;
+                output += "'s ";
+                output += ability + "!\n";
                 continue;
             }
             else
@@ -497,8 +546,15 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
 
         if (curr == "-activate")
         {
-            //|-activate|EFFECT
-            i++;
+            //|-activate|POKEMON|EFFECT
+            i++; std::string pk_ident = readable[i];
+            i++; std::string effect = readable[i];
+
+            if (effect == EFFECT_PROTECT)
+            {
+                output += pk_ident;
+                output += " protected itself!\n";
+            }
             continue;
         }
 
@@ -649,9 +705,30 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
 
         if (curr == "-damage")
         {
-            //|-damage|POKEMON|HP STATUS
+            //|-damage|POKEMON|HP STATUS|[from] SOURCE
+            i++; std::string pk_ident = readable[i];
             i++;
-            i++;
+            if (readable[i+1] != "\n")
+            {
+                i++; std::string fromsource = readable[i];
+                std::string source = fromsource.substr(7);
+                if (source == STATUS_POISON)
+                {
+                    output += pk_ident;
+                    output += " was hurt by poison!\n";
+                    continue;
+                }
+                if (source == STATUS_BURN)
+                {
+                    output += pk_ident;
+                    output += " was hurt by its burn!\n";
+                    continue;
+                }
+                
+                output += pk_ident;
+                output += " was damaged by ";
+                output += source + "!\n";
+            }
             continue;
         }
 
@@ -691,6 +768,7 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
         {
             //|-fail|POKEMON|ACTION
             i++; i++;
+            output += "But it failed!\n";
             continue;
         }
 
@@ -885,8 +963,14 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
         if (curr == "-singleturn")
         {
             //|-singleturn|POKEMON|MOVE
-            i++;
-            i++;
+            i++; std::string pk_ident = readable[i];
+            i++; std::string effect = readable[i];
+
+            if (effect == SINGLETURN_PROTECT)
+            {
+                output += pk_ident;
+                output += " protected itself!\n";
+            }
             continue;
         }
 
@@ -1003,7 +1087,78 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
         if (curr == "-weather")
         {
             //|-weather|WEATHER
-            i++;
+            i++; std::string weather = readable[i];
+            // weather is stored in m_battledata["weather"]
+            if (weather == WEATHER_NULL)
+            {
+                weather = m_battledata["weather"];
+                if (weather == WEATHER_SANDSTORM)
+                {
+                    output += "Sandstorm over.\n";
+                }
+                if (weather == WEATHER_SUN)
+                {
+                    output += "Bright Sunlight over.\n";
+                }
+                if (weather == WEATHER_RAIN)
+                {
+                    output += "The rain stopped.\n";
+                }
+                if (weather == WEATHER_HAIL)
+                {
+                    output += "Hail over.\n";
+                }
+                m_battledata["weather"] = WEATHER_NULL;
+                continue;
+            }
+            if (weather == WEATHER_SANDSTORM)
+            {
+                if (m_battledata["weather"].is_null() || m_battledata["weather"] != WEATHER_SANDSTORM)
+                {
+                    output += "A sandstorm kicked up!\n";
+                }
+                else
+                {
+                    output += "The sandstorm rages.\n";
+                }
+                m_battledata["weather"] = WEATHER_SANDSTORM;
+            }
+            if (weather == WEATHER_SUN)
+            {
+                if (m_battledata["weather"].is_null() || m_battledata["weather"] != WEATHER_SUN)
+                {
+                    output += "The sunlight turned harsh!\n";
+                }
+                else
+                {
+                    output += "The sunlight is strong.\n";
+                }
+                m_battledata["weather"] = WEATHER_SUN;
+            }
+            if (weather == WEATHER_RAIN)
+            {
+                if (m_battledata["weather"].is_null() || m_battledata["weather"] != WEATHER_RAIN)
+                {
+                    output += "It began to rain!\n";
+                }
+                else
+                {
+                    output += "It is raining.\n";
+                }
+                m_battledata["weather"] = WEATHER_RAIN;
+            }
+            if (weather == WEATHER_HAIL)
+            {
+                if (m_battledata["weather"].is_null() || m_battledata["weather"] != WEATHER_HAIL)
+                {
+                    output += "It began to hail!\n";
+                }
+                else
+                {
+                    output += "It is hailing.\n";
+                }
+                m_battledata["weather"] = WEATHER_HAIL;
+            }
             continue;
         }
 
@@ -1023,7 +1178,7 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
 
     }
 
-    return output;
+    return out;
 }
 
 

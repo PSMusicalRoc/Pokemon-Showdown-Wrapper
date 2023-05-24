@@ -253,7 +253,6 @@ void parse_cmd_to_vec(const std::string& cmd, std::vector<std::string>& outvec)
 }
 
 int main() {    
-    const char* command = "../pokemon-showdown/pokemon-showdown";
     int in_pipe[2];
     int out_pipe[2];
     pid_t pid;
@@ -274,14 +273,16 @@ int main() {
         dup2(in_pipe[0], STDIN_FILENO);
         dup2(out_pipe[1], STDOUT_FILENO);
 
+        close(in_pipe[0]);
+        close(out_pipe[1]);
+
         // Redirect stderr to /dev/null to suppress error messages
         int fd = open("/dev/null", O_WRONLY);
         dup2(fd, STDERR_FILENO);
 
-        execl(command, command, "simulate-battle", NULL);
+        execl("vendor/pokemon-showdown/pokemon-showdown", "pokemon-showdown", "simulate-battle", NULL);
 
-        close(in_pipe[0]);
-        close(out_pipe[1]);
+        std::cout << "The program has failed." << std::endl;
     } else {
         // Parent process: read user input and send it to child
         close(in_pipe[0]);
@@ -355,12 +356,13 @@ int main() {
                     outcmd += " " + cmd[i];
                 }
                 outcmd += "\n";
-                write(in_pipe[1], outcmd.c_str(), outcmd.size());
+                int retval = write(in_pipe[1], outcmd.c_str(), outcmd.size());
+                std::cout << retval << std::endl;
             }
             else continue;
 
             std::string output_str, full_out;
-            get_output(out_pipe[0], output_str);
+            get_output_timed(out_pipe[0], output_str, 5.0f);
             full_out = output_str;
             std::string parsed_string = parser.parsePShowdownOutput(output_str);
             while (output_str != "")
