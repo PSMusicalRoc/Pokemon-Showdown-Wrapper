@@ -13,11 +13,11 @@
 
 struct UnixPID
 {
-    UnixPID(pid_t pid, int* in, int* out)
+    UnixPID(pid_t pid, int in, int out)
         :processID(pid), inpipe(in), outpipe(out) {}
     pid_t processID;
-    int* inpipe;
-    int* outpipe;
+    int inpipe;
+    int outpipe;
 };
 
 class UNIX_PID_HANDLER : public PID_Handler<UnixPID>
@@ -25,17 +25,19 @@ class UNIX_PID_HANDLER : public PID_Handler<UnixPID>
 protected:
     UNIX_PID_HANDLER()
         :PID_Handler<UnixPID>() {}
-    static UNIX_PID_HANDLER* ptr = nullptr;
+    static UNIX_PID_HANDLER* ptr;
 
 public:
-    bool CreateFork(std::string& forkid, std::string& command) override;
-    bool EndFork(std::string& forkid) override;
-    int WriteToFork(std::string& forkid, std::string& input) override;
-    int ReadFromFork(std::string& forkid, std::string& output) override;
-    int ReadFromForkTimed(std::string& forkid, std::string& output, float seconds) override;
+    bool CreateFork(const std::string& forkid, const std::string& command) override;
+    bool EndFork(const std::string& forkid) override;
+    int WriteToFork(const std::string& forkid, const std::string& input) override;
+    int ReadFromFork(const std::string& forkid, std::string& output) override;
+    int ReadFromForkTimed(const std::string& forkid, std::string& output, float seconds) override;
 
-    virtual PID_Handler* Get() override;
-    virtual void DeleteHandler() override;
+    const UnixPID& GetForkData(const std::string& forkid) const override;
+
+    static PID_Handler* Get();
+    void DeleteHandler() override;
 
     void nix_get_output(int outpipe, std::string& output_str);
     void nix_get_output_timed(int outpipe, std::string& output_str, float num_secs);

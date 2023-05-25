@@ -1,16 +1,18 @@
 #include "UNIX/UNIX_PID_HANDLER.h"
+#include <iostream>
 
-bool UNIX_PID_HANDLER::CreateFork(std::string& forkid, std::string& command) override
+UNIX_PID_HANDLER* UNIX_PID_HANDLER::ptr = nullptr;
+
+bool UNIX_PID_HANDLER::CreateFork(const std::string& forkid, const std::string& command)
 {
     pid_t pid;
     pid_t retval = 0;
-    int[2] inpipe;
-    int[2] outpipe;
+    int inpipe[2];
+    int outpipe[2];
 
     if (pipe(inpipe) == -1 || pipe(outpipe) == -1) {
         std::cerr << "Error: pipe() failed!\n";
-        retval = -1;
-        kill(pid, SIGTERM);
+        return false;
     }
 
     if ((pid = fork()) == -1) {
@@ -22,8 +24,9 @@ bool UNIX_PID_HANDLER::CreateFork(std::string& forkid, std::string& command) ove
         close(inpipe[1]);
         close(outpipe[0]);
 
-        dup2(inpipe[0], STDIN_FILENO);
-        dup2(outpipe[1], STDOUT_FILENO);
+        int val = dup2(inpipe[0], STDIN_FILENO);
+        val = dup2(outpipe[1], STDOUT_FILENO);
+        //dup2(outpipe[1], STDERR_FILENO);
 
         close(inpipe[0]);
         close(outpipe[1]);
@@ -32,30 +35,65 @@ bool UNIX_PID_HANDLER::CreateFork(std::string& forkid, std::string& command) ove
         int fd = open("/dev/null", O_WRONLY);
         dup2(fd, STDERR_FILENO);
 
-        std::vector<char* const> args;
+        std::vector<std::string> inter; // an intermediate vec for strings
+        std::vector<const char*> args;
         size_t index = 0;
         while (index < command.size())
         {
             size_t next_space = command.find(' ', index);
+            size_t next_quote = command.find('"', index);
             std::string substr;
+            if (next_quote < next_space)
+            {
+                // group the stuff into one command :)
+                size_t ending_quote = command.find('"', next_quote+1);
+                if (ending_quote == command.npos)
+                {
+                    // no ending quote, just lump together
+                    // and hope it works
+                    substr = command.substr(next_quote + 1);
+                    inter.push_back(substr);
+                    index = command.size();
+                    continue;
+                }
+                else
+                {
+                    substr = command.substr(next_quote + 1, ending_quote - next_quote - 1);
+                    inter.push_back(substr);
+                    index = ending_quote + 1;
+                    continue;
+                }
+            }
+
             if (next_space == command.npos)
             {
                 substr = command.substr(index);
-                args.push_back(substr.c_str());
+                inter.push_back(substr);
                 index = command.size();
             }
             else
             {
                 substr = command.substr(index, next_space - index);
-                args.push_back(substr.c_str());
+                inter.push_back(substr);
                 index = next_space + 1;
             }
         }
+
+        for (int i = 0; i < inter.size(); i++)
+        {
+            args.push_back(inter.at(i).c_str());
+        }
         args.push_back(NULL);
+
+        /*for (const char* a : args)
+        {
+            std::cout << a << std::endl;
+        }*/
 
         retval = getpid();
 
-        execv(args[0], args.data());
+        execv(args[0], const_cast<char* const*>(args.data()));
+        std::cout << "Errno: " << errno << std::endl;
 
         std::cout << "The program has failed." << std::endl;
     } else {
@@ -63,42 +101,66 @@ bool UNIX_PID_HANDLER::CreateFork(std::string& forkid, std::string& command) ove
         close(inpipe[0]);
         close(outpipe[1]);
 
-        while (retval == 0) continue;
-
-        if (retval == -1)
-        {
-            return false;
-        }
-
-        // retval is now for sure the pid of the child
+        // pid is now for sure the pid of the child
         // process
-        _processes.
+        UnixPID pidobj(pid, inpipe[1], outpipe[0]);
+        _processes.emplace(forkid, pidobj);
 
-        return retval;
+        return true;
     }
 }
 
-bool UNIX_PID_HANDLER::EndFork(std::string& forkid) override
+bool UNIX_PID_HANDLER::EndFork(const std::string& forkid)
 {
+    typename std::map<std::string, UnixPID>::iterator it;
+    if ((it = _processes.find(forkid)) == _processes.end())
+    {
+        return true;
+    }
 
+    // it is an iterator pointing at the key-pair
+    close(it->second.inpipe);
+    close(it->second.outpipe);
+    int status;
+    if (waitpid(it->second.processID, &status, 1) == -1)
+        return false;
+
+    if (_processes.erase(forkid))
+        return true;
+    return false;
 }
 
-int UNIX_PID_HANDLER::WriteToFork(std::string& forkid, std::string& input) override
+int UNIX_PID_HANDLER::WriteToFork(const std::string& forkid, const std::string& input)
 {
-
+    UnixPID& pid = _processes.at(forkid);
+    ssize_t t = write(pid.inpipe, input.c_str(), input.size());
+    return t;
 }
 
-int UNIX_PID_HANDLER::ReadFromFork(std::string& forkid, std::string& output) override
+int UNIX_PID_HANDLER::ReadFromFork(const std::string& forkid, std::string& output)
 {
-
+    output = "";
+    UnixPID& pid = _processes.at(forkid);
+    nix_get_output(pid.outpipe, output);
+    return output.size();
 }
 
-int UNIX_PID_HANDLER::ReadFromForkTimed(std::string& forkid, std::string& output, float seconds) override
+int UNIX_PID_HANDLER::ReadFromForkTimed(const std::string& forkid, std::string& output, float seconds)
 {
-
+    output = "";
+    UnixPID& pid = _processes.at(forkid);
+    nix_get_output_timed(pid.outpipe, output, seconds);
+    return output.size();
 }
 
-PID_Handler* UNIX_PID_HANDLER::Get() override
+
+const UnixPID& UNIX_PID_HANDLER::GetForkData(const std::string& forkid) const
+{
+    return _processes.at(forkid);
+}
+
+
+PID_Handler<UnixPID>* UNIX_PID_HANDLER::Get()
 {
     if (!ptr)
     {
@@ -107,23 +169,10 @@ PID_Handler* UNIX_PID_HANDLER::Get() override
     return ptr;
 }
 
-void UNIX_PID_HANDLER::DeleteHandler() override
+void UNIX_PID_HANDLER::DeleteHandler()
 {
     delete ptr;
     ptr = 0;
-}
-
-
-pid_t UNIX_PID_HANDLER::CreateFork(int* inpipe, int* outpipe, std::string& command)
-{
-   
-}
-
-void UNIX_PID_HANDLER::CloseFork(pid_t child_pid)
-{
-    close(in_pipe[1]);
-    close(out_pipe[0]);
-    waitpid(child_pid, NULL, 0);
 }
 
 void UNIX_PID_HANDLER::nix_get_output(int outpipe, std::string& output_str)

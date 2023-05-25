@@ -1,6 +1,6 @@
 #include <iostream>
 #ifdef ROC_NIX
-#include "UNIX_PID_HANDLER.h"
+#include "UNIX/UNIX_PID_HANDLER.h"
 #elif ROC_WINDOWS
 #include <Windows.h>
 #endif
@@ -11,6 +11,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <filesystem>
 
 #include "PK_Rand.h"
 
@@ -24,18 +25,17 @@ using json=nlohmann::json;
 
 #ifdef ROC_NIX
 
-
+#define PIDTYPE PID_Handler<UnixPID>*
+#define PIDHANDLER UNIX_PID_HANDLER
 
 #elif ROC_WINDOWS
 
-HANDLE stin_read;
-HANDLE stin_write;
-HANDLE stout_read;
-HANDLE stout_write;
+#define PIDTYPE PID_Handler<Typehere>*
+#define PIDHANDLER WINDOWS_PID_HANDLER
 
 #endif
 
-void LoadTrainerData(std::string& battleFilename, json& playerdata, std::string& packed_team)
+void LoadTrainerData(std::string& battleFilename, json& playerdata, PIDTYPE handler, std::string& packed_team)
 {
     std::ifstream battleFile(battleFilename.c_str());
     if (!battleFile.is_open())
@@ -44,7 +44,7 @@ void LoadTrainerData(std::string& battleFilename, json& playerdata, std::string&
         return;
     }
     
-    std::string jsonText, pokepaste;
+    std::string jsonText;
     std::string inLine;
     while (std::getline(battleFile, inLine))
     {
@@ -58,68 +58,98 @@ void LoadTrainerData(std::string& battleFilename, json& playerdata, std::string&
 
     std::string ppaste_loc = playerdata["teamloc"];
 
-    
-    int child_outpipe[2];
-    int child_inpipe[2];
-    //std::cout << "About to pipe" << std::endl;
-
-    if (pipe(child_inpipe) == -1 || pipe(child_outpipe) == -1)
+    std::ifstream teamfile(ppaste_loc);
+    if (!teamfile.is_open())
     {
-        std::cerr << "Piping failed in setupAITrainerBattle()" << std::endl;
-    }
-
-    //std::cout << "Pipe success" << std::endl;
-    
-    pid_t child_pid;
-    if ((child_pid = fork()) == -1)
-    {
-        std::cerr << "Fork Failed in setupAITrainerBattle()" << std::endl;
+        std::cout << "Could not load battle file at " << ppaste_loc << std::endl;
         return;
     }
 
-    if (child_pid == 0)
+    std::string team;
+    while (std::getline(teamfile, inLine))
     {
-        // we are the child :)
-
-        // we don't need to read from the output pipe, or
-        // write to the input pipe
-        close(child_outpipe[0]);
-        close(child_inpipe[1]);
-
-        dup2(child_inpipe[0], STDIN_FILENO);
-        dup2(child_outpipe[1], STDOUT_FILENO);
-
-        std::string command = "/bin/cat /home/roc/GitHub/pshowdownwrapper/" + ppaste_loc + " | /home/roc/GitHub/pokemon-showdown/pokemon-showdown pack-team";
-
-        int retval = execl("/bin/sh", "sh", "-c", command.c_str(), NULL);
-        std::cout << "EXECL RETURNED : " << retval << std::endl;
-
-        close(child_inpipe[0]);
-        close(child_outpipe[1]);
+        team += inLine + "\n";
     }
-    else
+    teamfile.close();
+
+    std::filesystem::path base = std::filesystem::current_path();
+    std::string innercommand = "/bin/cat " + base.string() + "/" + ppaste_loc + " | vendor/pokemon-showdown/pokemon-showdown pack-team";
+    std::string command = "/bin/sh -c \"" + innercommand + "\"";
+    //std::string command = "vendor/pokemon-showdown/pokemon-showdown pack-team";
+    if (!handler->CreateFork("packteam", command))
     {
-        // parent process
-
-        close(child_outpipe[1]);
-        close(child_inpipe[0]);
-
-        get_output(child_outpipe[0], packed_team);
-        packed_team.erase(std::remove(packed_team.begin(), packed_team.end(), '\n'), packed_team.cend());
-
-        kill(child_pid, SIGINT);
-        waitpid(child_pid, NULL, 0);
+        std::cerr << "Could not create a pack-team thread." << std::endl;
+        return;
     }
+    
+    handler->ReadFromForkTimed("packteam", packed_team, 10.0f);
+    std::cout << packed_team << std::endl;
+    packed_team.erase(std::remove(packed_team.begin(), packed_team.end(), '\n'), packed_team.cend());
+    handler->EndFork("packteam");
+
+
+    
+    // int child_outpipe[2];
+    // int child_inpipe[2];
+    // //std::cout << "About to pipe" << std::endl;
+
+    // if (pipe(child_inpipe) == -1 || pipe(child_outpipe) == -1)
+    // {
+    //     std::cerr << "Piping failed in setupAITrainerBattle()" << std::endl;
+    // }
+
+    // //std::cout << "Pipe success" << std::endl;
+    
+    // pid_t child_pid;
+    // if ((child_pid = fork()) == -1)
+    // {
+    //     std::cerr << "Fork Failed in setupAITrainerBattle()" << std::endl;
+    //     return;
+    // }
+
+    // if (child_pid == 0)
+    // {
+    //     // we are the child :)
+
+    //     // we don't need to read from the output pipe, or
+    //     // write to the input pipe
+    //     close(child_outpipe[0]);
+    //     close(child_inpipe[1]);
+
+    //     dup2(child_inpipe[0], STDIN_FILENO);
+    //     dup2(child_outpipe[1], STDOUT_FILENO);
+
+    //     std::string command = "/bin/cat /home/roc/GitHub/pshowdownwrapper/" + ppaste_loc + " | /home/roc/GitHub/pokemon-showdown/pokemon-showdown pack-team";
+
+    //     int retval = execl("/bin/sh", "sh", "-c", command.c_str(), NULL);
+    //     std::cout << "EXECL RETURNED : " << retval << std::endl;
+
+    //     close(child_inpipe[0]);
+    //     close(child_outpipe[1]);
+    // }
+    // else
+    // {
+    //     // parent process
+
+    //     close(child_outpipe[1]);
+    //     close(child_inpipe[0]);
+
+    //     get_output(child_outpipe[0], packed_team);
+    //     packed_team.erase(std::remove(packed_team.begin(), packed_team.end(), '\n'), packed_team.cend());
+
+    //     kill(child_pid, SIGINT);
+    //     waitpid(child_pid, NULL, 0);
+    // }
 }
 
-void SetupAITrainerBattle(std::string& ai_filename, int inputstream, int outstream,
+void SetupAITrainerBattle(std::string& ai_filename, PIDTYPE handler,
     std::string& output, PShowdownParser& parser)
 {
     json aitrainer, player;
     std::string aitrainer_team, player_team;
     std::string player_filename = "data/player/playertrainer.pkteam";
-    LoadTrainerData(player_filename, player, player_team);
-    LoadTrainerData(ai_filename, aitrainer, aitrainer_team);
+    LoadTrainerData(player_filename, player, handler, player_team);
+    LoadTrainerData(ai_filename, aitrainer, handler, aitrainer_team);
 
     std::string ret;
 
@@ -127,9 +157,9 @@ void SetupAITrainerBattle(std::string& ai_filename, int inputstream, int outstre
     std::string command = ">start {\"formatid\":\"";
     command += aitrainer["format"];
     command += "\"}\n";
-    write(inputstream, command.c_str(), command.size());
+    handler->WriteToFork("showdown", command);
     //std::cout << "Getting output" << std::endl;
-    get_output(outstream, ret);
+    handler->ReadFromFork("showdown", ret);
     std::cout << ret << std::endl;
     //std::cout << "Parsing" << std::endl;
     output += parser.parsePShowdownOutput(ret);
@@ -143,9 +173,9 @@ void SetupAITrainerBattle(std::string& ai_filename, int inputstream, int outstre
     command += player_team;
     command += "\"}\n";
     //std::cout << command << std::endl;
-    write(inputstream, command.c_str(), command.size());
+    handler->WriteToFork("showdown", command);
     //std::cout << "Getting output" << std::endl;
-    get_output(outstream, ret);
+    handler->ReadFromFork("showdown", ret);
     std::cout << ret << std::endl;
     //std::cout << "Parsing" << std::endl;
     output += parser.parsePShowdownOutput(ret);
@@ -158,9 +188,9 @@ void SetupAITrainerBattle(std::string& ai_filename, int inputstream, int outstre
     command += "\",\"team\":\"";
     command += aitrainer_team;
     command += "\"}\n";
-    write(inputstream, command.c_str(), command.size());
+    handler->WriteToFork("showdown", command);
     //std::cout << "Getting output" << std::endl;
-    get_output(outstream, ret);
+    handler->ReadFromFork("showdown", ret);
     std::cout << ret << std::endl;
     //std::cout << "Parsing" << std::endl;
     output += parser.parsePShowdownOutput(ret);
@@ -191,7 +221,21 @@ void parse_cmd_to_vec(const std::string& cmd, std::vector<std::string>& outvec)
 }
 
 int main() {
-    PShowdownParser parser(in_pipe[1], out_pipe[0]);
+    PIDTYPE handler = PIDHANDLER::Get();
+
+    if (!handler->CreateFork("showdown", "vendor/pokemon-showdown/pokemon-showdown simulate-battle"))
+    {
+        std::cerr << "Could not create Pokemon Showdown thread!" << std::endl;
+        handler->DeleteHandler();
+        return -1;
+    }
+
+#ifdef ROC_NIX
+    const UnixPID& threadpid = handler->GetForkData("showdown");
+    // int inpipe = threadpid.inpipe;
+    // int outpipe = threadpid.outpipe;
+    PShowdownParser parser(threadpid.inpipe, threadpid.outpipe);
+#endif
 
     std::string incmd;
     while (true) {
@@ -216,7 +260,7 @@ int main() {
             std::string outcmd = ">start {\"formatid\":\"";
             outcmd += cmd[1];
             outcmd += "\"}\n";
-            write(in_pipe[1], outcmd.c_str(), outcmd.size());
+            handler->WriteToFork("showdown", outcmd);
         }
         else if (cmd[0] == "setplayer")
         {
@@ -226,7 +270,7 @@ int main() {
             outcmd += " {\"name\":\"";
             outcmd += cmd[2];
             outcmd += "\"}\n";
-            write(in_pipe[1], outcmd.c_str(), outcmd.size());
+            handler->WriteToFork("showdown", outcmd);
         }
         else if (cmd[0] == "moves")
         {
@@ -236,8 +280,7 @@ int main() {
         else if (cmd[0] == "loadbattle")
         {
             std::string out;
-            SetupAITrainerBattle(cmd[1], in_pipe[1], out_pipe[0],
-                out, parser);
+            SetupAITrainerBattle(cmd[1], handler, out, parser);
             std::cout << out << std::endl;
         }
         else if (cmd[0] == "use")
@@ -249,7 +292,7 @@ int main() {
                 outcmd += " " + cmd[i];
             }
             outcmd += "\n";
-            write(in_pipe[1], outcmd.c_str(), outcmd.size());
+            handler->WriteToFork("showdown", outcmd);
         }
         else if (cmd[0] == "switch")
         {
@@ -259,18 +302,17 @@ int main() {
                 outcmd += " " + cmd[i];
             }
             outcmd += "\n";
-            int retval = write(in_pipe[1], outcmd.c_str(), outcmd.size());
-            std::cout << retval << std::endl;
+            handler->WriteToFork("showdown", outcmd);
         }
         else continue;
 
         std::string output_str, full_out;
-        get_output_timed(out_pipe[0], output_str, 5.0f);
+        handler->ReadFromForkTimed("showdown", output_str, 5.0f);
         full_out = output_str;
         //std::string parsed_string = parser.parsePShowdownOutput(output_str);
         while (output_str != "")
         {
-            get_output_timed(out_pipe[0], output_str, 1.5);
+            handler->ReadFromForkTimed("showdown", output_str, 1.5);
             full_out += output_str;
         }
         std::string parsed_string = parser.parsePShowdownOutput(full_out);
