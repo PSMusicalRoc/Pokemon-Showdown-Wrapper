@@ -11,6 +11,9 @@
 #include <string>
 #include <vector>
 
+#define PIDTYPE PID_Handler<UnixPID>*
+#define PIDHANDLER UNIX_PID_HANDLER
+
 struct UnixPID
 {
     UnixPID(pid_t pid, int in, int out)

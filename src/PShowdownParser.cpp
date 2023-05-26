@@ -250,7 +250,7 @@ std::string PShowdownParser::parsePShowdownOutput(const std::string& input)
                 }
                 else
                 {
-                    AI_Choose_Move(m_p2data, m_inpipe, AI_TYPE_RANDOM);
+                    AI_Choose_Move(m_p2data, fork, handler, AI_TYPE_RANDOM);
                 }
             }
         }

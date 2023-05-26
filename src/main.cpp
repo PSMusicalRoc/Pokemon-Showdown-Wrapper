@@ -1,9 +1,5 @@
 #include <iostream>
-#ifdef ROC_NIX
-#include "UNIX/UNIX_PID_HANDLER.h"
-#elif ROC_WINDOWS
-#include <Windows.h>
-#endif
+#include "ProcessID_Handler.h"
 #include <vector>
 #include <algorithm>
 
@@ -22,18 +18,6 @@
 using json=nlohmann::json;
 
 // Important things for Linux and Windows differentiation
-
-#ifdef ROC_NIX
-
-#define PIDTYPE PID_Handler<UnixPID>*
-#define PIDHANDLER UNIX_PID_HANDLER
-
-#elif ROC_WINDOWS
-
-#define PIDTYPE PID_Handler<Typehere>*
-#define PIDHANDLER WINDOWS_PID_HANDLER
-
-#endif
 
 void LoadTrainerData(std::string& battleFilename, json& playerdata, PIDTYPE handler, std::string& packed_team)
 {
@@ -222,6 +206,7 @@ void parse_cmd_to_vec(const std::string& cmd, std::vector<std::string>& outvec)
 
 int main() {
     PIDTYPE handler = PIDHANDLER::Get();
+    PShowdownParser parser("showdown", handler);
 
     if (!handler->CreateFork("showdown", "vendor/pokemon-showdown/pokemon-showdown simulate-battle"))
     {
@@ -229,13 +214,6 @@ int main() {
         handler->DeleteHandler();
         return -1;
     }
-
-#ifdef ROC_NIX
-    const UnixPID& threadpid = handler->GetForkData("showdown");
-    // int inpipe = threadpid.inpipe;
-    // int outpipe = threadpid.outpipe;
-    PShowdownParser parser(threadpid.inpipe, threadpid.outpipe);
-#endif
 
     std::string incmd;
     while (true) {

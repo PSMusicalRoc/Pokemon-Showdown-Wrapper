@@ -6,20 +6,20 @@
 
 #include <iostream>
 
-void AI_Choose_Move(json& playerdata, int writepipe, std::string aitype)
+void AI_Choose_Move(json& playerdata, std::string& fork, PIDTYPE handler, std::string aitype)
 {
     if (aitype == AI_TYPE_RANDOM)
     {
-        __AI_Choose_Random(playerdata, writepipe);
+        __AI_Choose_Random(playerdata, fork, handler);
     }
     else
     {
         std::string command = ">p2 move 1\n";
-        write(writepipe, command.c_str(), command.size());
+        handler->WriteToFork(fork, command);
     }
 }
 
-void __AI_Choose_Random(json& playerdata, int writepipe)
+void __AI_Choose_Random(json& playerdata, std::string& fork, PIDTYPE handler)
 {
     // this line inconsistently freezes the program
     // need to figure out why but too lazy atm lol
@@ -29,5 +29,5 @@ void __AI_Choose_Random(json& playerdata, int writepipe)
     std::string command = ">p2 move ";
     command += std::to_string(choice);
     command += "\n";
-    write(writepipe, command.c_str(), command.size());
+    handler->WriteToFork(fork, command);
 }

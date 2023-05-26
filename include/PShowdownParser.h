@@ -4,14 +4,15 @@
 #include <string>
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include "ProcessID_Handler.h"
 
 using json=nlohmann::json;
 
 class PShowdownParser
 {
 public:
-    PShowdownParser(int inpipe, int outpipe, int player_perspective = 1)
-        :m_inpipe(inpipe), m_outpipe(outpipe), m_perspective(player_perspective) {}
+    PShowdownParser(const std::string& showdown_fork, PIDTYPE pidhandler, int player_perspective = 1)
+        :fork(showdown_fork), handler(pidhandler), m_perspective(player_perspective) {}
 
     std::string parsePShowdownOutput(const std::string& input);
 
@@ -40,8 +41,8 @@ private:
 
     bool m_opp_needs_select_move = false;
 
-    int m_inpipe;
-    int m_outpipe;
+    std::string fork;
+    PIDTYPE handler;
 };
 
 #endif
