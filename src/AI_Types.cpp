@@ -25,7 +25,9 @@ void __AI_Choose_Random(json& playerdata, std::string& fork, PIDTYPE handler)
     // need to figure out why but too lazy atm lol
     //int choice = PK_RAND::mt_rand() % 4;
     int choice = 1 + PK_RAND::mt_rand() % 4;
+#ifdef ROC_DEBUG
     std::cout << choice << std::endl;
+#endif
     std::string command = ">p2 move ";
     command += std::to_string(choice);
     command += "\n";

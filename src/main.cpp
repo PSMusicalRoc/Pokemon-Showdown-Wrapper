@@ -59,7 +59,6 @@ void LoadTrainerData(std::string& battleFilename, json& playerdata, PIDTYPE hand
     std::filesystem::path base = std::filesystem::current_path();
     std::string innercommand = "/bin/cat " + base.string() + "/" + ppaste_loc + " | vendor/pokemon-showdown/pokemon-showdown pack-team";
     std::string command = "/bin/sh -c \"" + innercommand + "\"";
-    //std::string command = "vendor/pokemon-showdown/pokemon-showdown pack-team";
     if (!handler->CreateFork("packteam", command))
     {
         std::cerr << "Could not create a pack-team thread." << std::endl;
@@ -67,63 +66,11 @@ void LoadTrainerData(std::string& battleFilename, json& playerdata, PIDTYPE hand
     }
     
     handler->ReadFromForkTimed("packteam", packed_team, 10.0f);
+#ifdef ROC_DEBUG
     std::cout << packed_team << std::endl;
+#endif
     packed_team.erase(std::remove(packed_team.begin(), packed_team.end(), '\n'), packed_team.cend());
     handler->EndFork("packteam");
-
-
-    
-    // int child_outpipe[2];
-    // int child_inpipe[2];
-    // //std::cout << "About to pipe" << std::endl;
-
-    // if (pipe(child_inpipe) == -1 || pipe(child_outpipe) == -1)
-    // {
-    //     std::cerr << "Piping failed in setupAITrainerBattle()" << std::endl;
-    // }
-
-    // //std::cout << "Pipe success" << std::endl;
-    
-    // pid_t child_pid;
-    // if ((child_pid = fork()) == -1)
-    // {
-    //     std::cerr << "Fork Failed in setupAITrainerBattle()" << std::endl;
-    //     return;
-    // }
-
-    // if (child_pid == 0)
-    // {
-    //     // we are the child :)
-
-    //     // we don't need to read from the output pipe, or
-    //     // write to the input pipe
-    //     close(child_outpipe[0]);
-    //     close(child_inpipe[1]);
-
-    //     dup2(child_inpipe[0], STDIN_FILENO);
-    //     dup2(child_outpipe[1], STDOUT_FILENO);
-
-    //     std::string command = "/bin/cat /home/roc/GitHub/pshowdownwrapper/" + ppaste_loc + " | /home/roc/GitHub/pokemon-showdown/pokemon-showdown pack-team";
-
-    //     int retval = execl("/bin/sh", "sh", "-c", command.c_str(), NULL);
-    //     std::cout << "EXECL RETURNED : " << retval << std::endl;
-
-    //     close(child_inpipe[0]);
-    //     close(child_outpipe[1]);
-    // }
-    // else
-    // {
-    //     // parent process
-
-    //     close(child_outpipe[1]);
-    //     close(child_inpipe[0]);
-
-    //     get_output(child_outpipe[0], packed_team);
-    //     packed_team.erase(std::remove(packed_team.begin(), packed_team.end(), '\n'), packed_team.cend());
-
-    //     kill(child_pid, SIGINT);
-    //     waitpid(child_pid, NULL, 0);
-    // }
 }
 
 void SetupAITrainerBattle(std::string& ai_filename, PIDTYPE handler,
@@ -144,7 +91,9 @@ void SetupAITrainerBattle(std::string& ai_filename, PIDTYPE handler,
     handler->WriteToFork("showdown", command);
     //std::cout << "Getting output" << std::endl;
     handler->ReadFromFork("showdown", ret);
+#ifdef ROC_DEBUG
     std::cout << ret << std::endl;
+#endif
     //std::cout << "Parsing" << std::endl;
     output += parser.parsePShowdownOutput(ret);
 
@@ -160,7 +109,9 @@ void SetupAITrainerBattle(std::string& ai_filename, PIDTYPE handler,
     handler->WriteToFork("showdown", command);
     //std::cout << "Getting output" << std::endl;
     handler->ReadFromFork("showdown", ret);
+#ifdef ROC_DEBUG
     std::cout << ret << std::endl;
+#endif
     //std::cout << "Parsing" << std::endl;
     output += parser.parsePShowdownOutput(ret);
 
@@ -175,7 +126,9 @@ void SetupAITrainerBattle(std::string& ai_filename, PIDTYPE handler,
     handler->WriteToFork("showdown", command);
     //std::cout << "Getting output" << std::endl;
     handler->ReadFromFork("showdown", ret);
+#ifdef ROC_DEBUG
     std::cout << ret << std::endl;
+#endif
     //std::cout << "Parsing" << std::endl;
     output += parser.parsePShowdownOutput(ret);
 
@@ -294,7 +247,9 @@ int main() {
             full_out += output_str;
         }
         std::string parsed_string = parser.parsePShowdownOutput(full_out);
+#ifdef ROC_DEBUG
         std::cout << full_out << std::endl;
+#endif
         std::cout << std::endl << parsed_string << std::endl;
 
         /**

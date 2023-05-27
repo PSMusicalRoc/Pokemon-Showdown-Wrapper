@@ -26,9 +26,8 @@ filter "system:Linux"
     }
 
 filter "configurations:Debug"
-    defines { "DEBUG" }  
+    defines { "ROC_DEBUG" }  
     symbols "On" 
 
-filter "configurations:Release"  
-    defines { "NDEBUG" }    
+filter "configurations:Release" 
     optimize "On" 
